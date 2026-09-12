@@ -34,9 +34,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 3. ጥሪን መቀበል (Answer Call)
+    // 3. ጥሪን መቀበል (Answer Call) - የደዋዩን በኩል ICE candidates ለማስተካከል targetSocketId እንልካለን
     socket.on('accept-call', ({ callerSocketId, answer }) => {
-        io.to(callerSocketId).emit('call-accepted', { answer });
+        io.to(callerSocketId).emit('call-accepted', { 
+            answer: answer,
+            targetSocketId: socket.id 
+        });
     });
 
     // 4. ICE Candidates መለዋወጥ
