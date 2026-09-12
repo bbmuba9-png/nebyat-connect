@@ -19,17 +19,19 @@
 
     <h1>Nebyat Connect</h1>
 
-    <!-- 1. ስልክ ቁጥር መመዝገቢያ ክፍል -->
+    <!-- 1. ስም እና ስልክ ቁጥር መመዝገቢያ ክፍል -->
     <div id="register-container" class="box">
-        <h3>ስልክ ቁጥርዎን ያስገቡ</h3>
-        <input type="text" id="phone-input" placeholder="ምሳሌ፦ 0911223344">
+        <h3>መመዝገቢያ</h3>
+        <input type="text" id="name-input" placeholder="ስምዎን ያስገቡ (ምሳሌ፦ ከበደ)">
+        <br>
+        <input type="text" id="phone-input" placeholder="ስልክ ቁጥር (ምሳሌ፦ 0911223344)">
         <br>
         <button id="register-btn">ተመዝገብ (Register)</button>
     </div>
 
     <!-- 2. መደወያ ክፍል -->
     <div id="call-interface" class="box">
-        <h3 id="my-phone-display"></h3>
+        <h3 id="my-info-display"></h3>
         <input type="text" id="target-input" placeholder="የሚደውሉበትን ቁጥር ያስገቡ">
         <br>
         <button id="call-btn">ደውል (Call)</button>
@@ -50,14 +52,16 @@
         const registerContainer = document.getElementById('register-container');
         const callInterface = document.getElementById('call-interface');
         const activeCallBox = document.getElementById('active-call');
+        const nameInput = document.getElementById('name-input');
         const phoneInput = document.getElementById('phone-input');
         const registerBtn = document.getElementById('register-btn');
-        const myPhoneDisplay = document.getElementById('my-phone-display');
+        const myInfoDisplay = document.getElementById('my-info-display');
         const targetInput = document.getElementById('target-input');
         const callBtn = document.getElementById('call-btn');
         const remoteAudio = document.getElementById('remote-audio');
 
         let myPhoneNumber = '';
+        let myName = '';
         let peerConnection;
         let localStream;
         let targetSocketIdGlobal;
@@ -66,7 +70,7 @@
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         };
 
-        // ማይክሮፎን ፍቃድ መጠየቅ እና ማዘጋጀት
+        // ማይክሮፎን ፍቃድ መጠየቅ
         async function setupLocalStream() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -75,34 +79,51 @@
             }
         }
 
-        // ስልክ ቁጥር መመዝገብ
-        registerBtn.addEventListener('click', async () => {
-            myPhoneNumber = phoneInput.value.trim();
-            if (myPhoneNumber) {
+        // ገጽ ሲከፈት መረጃው በ localStorage ውስጥ መኖሩን ማረጋገጥ (Auto-login)
+        window.addEventListener('load', async () => {
+            const savedPhone = localStorage.getItem('nebyat_phone');
+            const savedName = localStorage.getItem('nebyat_name');
+
+            if (savedPhone && savedName) {
+                myPhoneNumber = savedPhone;
+                myName = savedName;
                 await setupLocalStream();
-                socket.emit('register-phone', myPhoneNumber);
+                socket.emit('register-user', { phoneNumber: myPhoneNumber, name: myName });
                 registerContainer.style.display = 'none';
                 callInterface.style.display = 'block';
-                myPhoneDisplay.innerText = `የእርስዎ ቁጥር: ${myPhoneNumber}`;
+                myInfoDisplay.innerText = `${myName} (${myPhoneNumber})`;
+            }
+        });
+
+        // ስም እና ስልክ ቁጥር መመዝገብ
+        registerBtn.addEventListener('click', async () => {
+            myName = nameInput.value.trim();
+            myPhoneNumber = phoneInput.value.trim();
+
+            if (myName && myPhoneNumber) {
+                localStorage.setItem('nebyat_phone', myPhoneNumber);
+                localStorage.setItem('nebyat_name', myName);
+                await setupLocalStream();
+                socket.emit('register-user', { phoneNumber: myPhoneNumber, name: myName });
+                registerContainer.style.display = 'none';
+                callInterface.style.display = 'block';
+                myInfoDisplay.innerText = `${myName} (${myPhoneNumber})`;
             } else {
-                alert('እባክዎ ትክክለኛ ስልክ ቁጥር ያስገቡ!');
+                alert('እባክዎ ስምዎን እና ስልክ ቁጥርዎን በትክክል ያስገቡ!');
             }
         });
 
         function createPeerConnection(targetSocketId) {
             peerConnection = new RTCPeerConnection(iceServers);
 
-            // የኛን ማይክ ድምጽ ወደ ሌላው ሰው መላክ
             if (localStream) {
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             }
 
-            // የሌላውን ሰው ድምጽ መቀበል
             peerConnection.ontrack = event => {
                 remoteAudio.srcObject = event.streams[0];
             };
 
-            // ICE Candidates መላክ
             peerConnection.onicecandidate = event => {
                 if (event.candidate) {
                     socket.emit('ice-candidate', {
@@ -121,8 +142,6 @@
                 return;
             }
 
-            // በመጀመሪያ የሶኬት መለያ ለማግኘት (ወይም በቀጥታ በሰርቨር በኩል ማስተላለፍ)
-            // ለቀላል አሰራር ሰርቨር ራሱ ፔር ኮኔክሽን እንዲጀምር እናደርጋለን
             peerConnection = new RTCPeerConnection(iceServers);
             if (localStream) {
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
@@ -144,16 +163,17 @@
             socket.emit('call-user', {
                 targetPhoneNumber: targetPhoneNumber,
                 callerPhoneNumber: myPhoneNumber,
+                callerName: myName,
                 offer: offer
             });
 
             alert('ጥሪ ተልኳል፣ ምላሽ በመጠበቅ ላይ...');
         });
 
-        // ገቢ ጥሪ ሲመጣ
-        socket.on('incoming-call', async ({ callerPhoneNumber, callerSocketId, offer }) => {
+        // ገቢ ጥሪ ሲመጣ (የደዋዩን ስም እና ቁጥር ያሳያል)
+        socket.on('incoming-call', async ({ callerPhoneNumber, callerName, callerSocketId, offer }) => {
             targetSocketIdGlobal = callerSocketId;
-            const accept = confirm(`ከ ${callerPhoneNumber} የድምጽ ጥሪ መጥቷል መቀበል ይፈልጋሉ?`);
+            const accept = confirm(`ከ ${callerName} (${callerPhoneNumber}) የድምጽ ጥሪ መጥቷል መቀበል ይፈልጋሉ?`);
             
             if (accept) {
                 createPeerConnection(callerSocketId);
