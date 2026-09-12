@@ -5,28 +5,30 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-const users = {}; 
+// ተጠቃሚዎችን በስልክ ቁጥር እና ስም ለመያዝ
+const users = {}; // format: { phoneNumber: { socketId, name } }
 
 io.on('connection', (socket) => {
     console.log('ተጠቃሚ ተገናኝቷል (Connected):', socket.id);
 
-    // 1. ስልክ ቁጥር መመዝገብ
-    socket.on('register-phone', (phoneNumber) => {
-        users[phoneNumber] = socket.id;
-        console.log(`ስልክ ቁጥር ተመዝግቧል: ${phoneNumber} -> ሶኬት ID: ${socket.id}`);
+    // 1. ስም እና ስልክ ቁጥር መመዝገብ
+    socket.on('register-user', ({ phoneNumber, name }) => {
+        users[phoneNumber] = { socketId: socket.id, name: name };
+        console.log(`ተጠቃሚ ተመዝግቧል: ${name} (${phoneNumber}) -> ሶኬት ID: ${socket.id}`);
     });
 
     // 2. ጥሪ መጀመር (Call User)
-    socket.on('call-user', ({ targetPhoneNumber, callerPhoneNumber, offer }) => {
-        const targetSocketId = users[targetPhoneNumber];
+    socket.on('call-user', ({ targetPhoneNumber, callerPhoneNumber, callerName, offer }) => {
+        const targetUser = users[targetPhoneNumber];
 
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('incoming-call', {
+        if (targetUser) {
+            io.to(targetUser.socketId).emit('incoming-call', {
                 callerPhoneNumber: callerPhoneNumber,
+                callerName: callerName,
                 callerSocketId: socket.id,
                 offer: offer
             });
-            console.log(`ጥሪ ከ ${callerPhoneNumber} ወደ ${targetPhoneNumber} ተልኳል`);
+            console.log(`ጥሪ ከ ${callerName} (${callerPhoneNumber}) ወደ ${targetPhoneNumber} ተልኳል`);
         } else {
             socket.emit('call-failed', { message: 'ተጠቃሚው ኦንላይን አይደለም ወይም አልተገኘም!' });
         }
@@ -45,9 +47,9 @@ io.on('connection', (socket) => {
     // 5. ሲቋረጥ (Disconnect)
     socket.on('disconnect', () => {
         for (let phone in users) {
-            if (users[phone] === socket.id) {
+            if (users[phone].socketId === socket.id) {
+                console.log(`ተጠቃሚ ወጥቷል (Disconnected): ${users[phone].name} (${phone})`);
                 delete users[phone];
-                console.log(`ተጠቃሚ ወጥቷል (Disconnected): ${phone}`);
                 break;
             }
         }
