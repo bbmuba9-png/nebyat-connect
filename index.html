@@ -76,36 +76,36 @@
         async function setupLocalStream() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                return true;
             } catch (error) {
                 alert('ማይክሮፎን መጠቀም አልተቻለም: ' + error.message);
+                return false;
             }
         }
 
-        // ገጽ ሲከፈት መረጃው በ localStorage ውስጥ መኖሩን ማረጋገጥ (Auto-login)
-        window.addEventListener('load', async () => {
+        // ገጽ ሲከፈት መረጃው በ localStorage ውስጥ መኖሩን ማረጋገጥ (Auto-login) - ማይክሮፎን በቀጥታ አንጠይቅም
+        window.addEventListener('load', () => {
             const savedPhone = localStorage.getItem('nebyat_phone');
             const savedName = localStorage.getItem('nebyat_name');
 
             if (savedPhone && savedName) {
-                myPhoneNumber = savedPhone;
-                myName = savedName;
-                await setupLocalStream();
-                socket.emit('register-user', { phoneNumber: myPhoneNumber, name: myName });
-                registerContainer.style.display = 'none';
-                callInterface.style.display = 'block';
-                myInfoDisplay.innerText = `${myName} (${myPhoneNumber})`;
+                nameInput.value = savedName;
+                phoneInput.value = savedPhone;
             }
         });
 
-        // ስም እና ስልክ ቁጥር መመዝገብ
+        // ስም እና ስልክ ቁጥር መመዝገብ (በተጠቃሚ ንክኪ ብቻ ማይክሮፎን ይጠየቃል)
         registerBtn.addEventListener('click', async () => {
             myName = nameInput.value.trim();
             myPhoneNumber = phoneInput.value.trim();
 
             if (myName && myPhoneNumber) {
+                const micSuccess = await setupLocalStream();
+                if (!micSuccess) return;
+
                 localStorage.setItem('nebyat_phone', myPhoneNumber);
                 localStorage.setItem('nebyat_name', myName);
-                await setupLocalStream();
+                
                 socket.emit('register-user', { phoneNumber: myPhoneNumber, name: myName });
                 registerContainer.style.display = 'none';
                 callInterface.style.display = 'block';
@@ -189,6 +189,12 @@
             const accept = confirm(`ከ ${callerName} (${callerPhoneNumber}) የድምጽ ጥሪ መጥቷል መቀበል ይፈልጋሉ?`);
             
             if (accept) {
+                // ገቢ ጥሪ ሲቀበል ማይክሮፎኑ ከሌለ መጠየቅ
+                if (!localStream) {
+                    const micSuccess = await setupLocalStream();
+                    if (!micSuccess) return;
+                }
+
                 createPeerConnection(callerSocketId);
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await peerConnection.createAnswer();
@@ -204,7 +210,7 @@
             }
         });
 
-        // ጥሪው ሲቀበል (የደዋዩ በኩል targetSocketIdGlobal ይያዛል)
+        // ጥሪው ሲቀበል
         socket.on('call-accepted', async ({ answer, targetSocketId }) => {
             targetSocketIdGlobal = targetSocketId;
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
