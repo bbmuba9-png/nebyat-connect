@@ -10,7 +10,7 @@
         h1 { color: #333; }
         .box { background: white; padding: 20px; margin: 15px auto; width: 300px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         input { padding: 10px; font-size: 16px; width: 80%; margin-bottom: 10px; }
-        button { padding: 10px 20px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button { padding: 10px 20px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px; }
         button:hover { background: #218838; }
         #call-interface, #active-call { display: none; }
     </style>
@@ -41,10 +41,11 @@
     <div id="active-call" class="box">
         <h3>ጥሪ ተገናኝቷል! (Connected)</h3>
         <p id="call-status">እየተነጋገሩ ነው...</p>
+        <button id="play-audio-btn" style="background: #007bff;">ድምጽ አጫውት (Listen Audio)</button>
     </div>
 
     <!-- ድምጽ ማዳመጫ ኤለመንት -->
-    <audio id="remote-audio" autoplay></audio>
+    <audio id="remote-audio" autoplay playsinline></audio>
 
     <script>
         const socket = io();
@@ -59,6 +60,7 @@
         const targetInput = document.getElementById('target-input');
         const callBtn = document.getElementById('call-btn');
         const remoteAudio = document.getElementById('remote-audio');
+        const playAudioBtn = document.getElementById('play-audio-btn');
 
         let myPhoneNumber = '';
         let myName = '';
@@ -70,7 +72,7 @@
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         };
 
-        // ማይክሮፎን ፍቃድ መጠየቅ
+        // ማይክሮፎን ፈቃድ መጠየቅ
         async function setupLocalStream() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -122,6 +124,7 @@
 
             peerConnection.ontrack = event => {
                 remoteAudio.srcObject = event.streams[0];
+                remoteAudio.play().catch(e => console.log("Autoplay blocked:", e));
             };
 
             peerConnection.onicecandidate = event => {
@@ -149,6 +152,7 @@
 
             peerConnection.ontrack = event => {
                 remoteAudio.srcObject = event.streams[0];
+                remoteAudio.play().catch(e => console.log("Autoplay blocked:", e));
             };
 
             peerConnection.onicecandidate = event => {
@@ -170,7 +174,16 @@
             alert('ጥሪ ተልኳል፣ ምላሽ በመጠበቅ ላይ...');
         });
 
-        // ገቢ ጥሪ ሲመጣ (የደዋዩን ስም እና ቁጥር ያሳያል)
+        // ድምጽ በድጋሚ ማጫወቻ ቁልፍ ለማስጀመር
+        playAudioBtn.addEventListener('click', () => {
+            remoteAudio.play().then(() => {
+                alert('ድምጽ ማጫወት ተጀምሯል!');
+            }).catch(e => {
+                alert('ድምጽ ማጫወት አልተቻለም: ' + e.message);
+            });
+        });
+
+        // ገቢ ጥሪ ሲመጣ
         socket.on('incoming-call', async ({ callerPhoneNumber, callerName, callerSocketId, offer }) => {
             targetSocketIdGlobal = callerSocketId;
             const accept = confirm(`ከ ${callerName} (${callerPhoneNumber}) የድምጽ ጥሪ መጥቷል መቀበል ይፈልጋሉ?`);
