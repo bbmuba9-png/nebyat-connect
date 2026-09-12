@@ -204,8 +204,9 @@
             }
         });
 
-        // ጥሪው ሲቀበል
-        socket.on('call-accepted', async ({ answer }) => {
+        // ጥሪው ሲቀበል (የደዋዩ በኩል targetSocketIdGlobal ይያዛል)
+        socket.on('call-accepted', async ({ answer, targetSocketId }) => {
+            targetSocketIdGlobal = targetSocketId;
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             callInterface.style.display = 'none';
             activeCallBox.style.display = 'block';
