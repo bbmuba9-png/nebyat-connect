@@ -5,41 +5,44 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-// ተጠቃሚዎች ስልክ ቁጥራቸውን እና የሶኬት መለያቸውን (Socket ID) ለመያዝ
 const users = {}; 
 
 io.on('connection', (socket) => {
     console.log('ተጠቃሚ ተገናኝቷል (Connected):', socket.id);
 
-    // 1. ተጠቃሚው ስልክ ቁጥሩን ሲመዘግብ
+    // 1. ስልክ ቁጥር መመዝገብ
     socket.on('register-phone', (phoneNumber) => {
         users[phoneNumber] = socket.id;
         console.log(`ስልክ ቁጥር ተመዝግቧል: ${phoneNumber} -> ሶኬት ID: ${socket.id}`);
     });
 
-    // 2. ቀጥተኛ ጥሪ ማድረግ (Direct Call Signaling)
-    socket.on('call-user', ({ targetPhoneNumber, callerPhoneNumber }) => {
+    // 2. ጥሪ መጀመር (Call User)
+    socket.on('call-user', ({ targetPhoneNumber, callerPhoneNumber, offer }) => {
         const targetSocketId = users[targetPhoneNumber];
 
         if (targetSocketId) {
-            // ጥሪውን ወደ ተቀባዩ ስልክ መላክ (Ringing Event)
             io.to(targetSocketId).emit('incoming-call', {
                 callerPhoneNumber: callerPhoneNumber,
-                callerSocketId: socket.id
+                callerSocketId: socket.id,
+                offer: offer
             });
             console.log(`ጥሪ ከ ${callerPhoneNumber} ወደ ${targetPhoneNumber} ተልኳል`);
         } else {
-            // ተጠቃሚው ኦንላይን ካልሆነ
             socket.emit('call-failed', { message: 'ተጠቃሚው ኦንላይን አይደለም ወይም አልተገኘም!' });
         }
     });
 
-    // 3. ጥሪውን መቀበል (Answer Call)
-    socket.on('accept-call', ({ callerSocketId, signal }) => {
-        io.to(callerSocketId).emit('call-accepted', signal);
+    // 3. ጥሪን መቀበል (Answer Call)
+    socket.on('accept-call', ({ callerSocketId, answer }) => {
+        io.to(callerSocketId).emit('call-accepted', { answer });
     });
 
-    // 4. ተጠቃሚው ሲቋረጥ (Disconnect)
+    // 4. ICE Candidates መለዋወጥ
+    socket.on('ice-candidate', ({ targetSocketId, candidate }) => {
+        io.to(targetSocketId).emit('ice-candidate', { candidate });
+    });
+
+    // 5. ሲቋረጥ (Disconnect)
     socket.on('disconnect', () => {
         for (let phone in users) {
             if (users[phone] === socket.id) {
