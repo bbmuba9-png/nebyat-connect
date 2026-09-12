@@ -3,42 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nebyat Connect</title>
+    <title>Nebyat Connect - Direct Call</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f4f4f9; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #f4f4f9; }
         h1 { color: #333; }
-        #room-container { margin-top: 20px; }
-        input { padding: 10px; font-size: 16px; width: 200px; }
-        button { padding: 10px 20px; font-size: 16px; background: #28a745; color: white; border: none; cursor: pointer; }
+        .box { background: white; padding: 20px; margin: 15px auto; width: 300px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input { padding: 10px; font-size: 16px; width: 80%; margin-bottom: 10px; }
+        button { padding: 10px 20px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background: #218838; }
+        #call-interface { display: none; }
     </style>
 </head>
 <body>
-    <h1>Nebyat Connect - P2P Voice</h1>
-    <div id="room-container">
-        <input type="text" id="room-input" placeholder="Enter Room ID">
-        <button id="join-btn">Join Room</button>
+
+    <h1>Nebyat Connect</h1>
+
+    <!-- 1. ስልክ ቁጥር መመዝገቢያ ክፍል -->
+    <div id="register-container" class="box">
+        <h3>ስልክ ቁጥርዎን ያስገቡ</h3>
+        <input type="text" id="phone-input" placeholder="ምሳሌ፦ 0911223344">
+        <br>
+        <button id="register-btn">ተመዝገብ (Register)</button>
+    </div>
+
+    <!-- 2. መደወያ ክፍል -->
+    <div id="call-interface" class="box">
+        <h3 id="my-phone-display"></h3>
+        <input type="text" id="target-input" placeholder="የሚደውሉበትን ቁጥር ያስገቡ">
+        <br>
+        <button id="call-btn">ደውል (Call)</button>
     </div>
 
     <script>
         const socket = io();
-        const joinBtn = document.getElementById('join-btn');
-        const roomInput = document.getElementById('room-input');
 
-        joinBtn.addEventListener('click', () => {
-            const roomId = roomInput.value.trim();
-            if (roomId) {
-                socket.emit('join-room', roomId, socket.id);
-                alert('Joined room: ' + roomId);
+        const registerContainer = document.getElementById('register-container');
+        const callInterface = document.getElementById('call-interface');
+        const phoneInput = document.getElementById('phone-input');
+        const registerBtn = document.getElementById('register-btn');
+        const myPhoneDisplay = document.getElementById('my-phone-display');
+        const targetInput = document.getElementById('target-input');
+        const callBtn = document.getElementById('call-btn');
+
+        let myPhoneNumber = '';
+
+        // ስልክ ቁጥር መመዝገብ
+        registerBtn.addEventListener('click', () => {
+            myPhoneNumber = phoneInput.value.trim();
+            if (myPhoneNumber) {
+                socket.emit('register-phone', myPhoneNumber);
+                registerContainer.style.display = 'none';
+                callInterface.style.display = 'block';
+                myPhoneDisplay.innerText = `የእርስዎ ቁጥር: ${myPhoneNumber}`;
             } else {
-                alert('Please enter a valid Room ID');
+                alert('እባክዎ ትክክለኛ ስልክ ቁጥር ያስገቡ!');
             }
         });
 
-        socket.on('user-connected', userId => {
-            console.log('User connected: ' + userId);
-            alert('Another user connected to the room!');
+        // ጥሪ ማድረግ
+        callBtn.addEventListener('click', () => {
+            const targetPhoneNumber = targetInput.value.trim();
+            if (targetPhoneNumber) {
+                socket.emit('call-user', {
+                    targetPhoneNumber: targetPhoneNumber,
+                    callerPhoneNumber: myPhoneNumber
+                });
+                alert('ጥሪ ተልኳል፣ ምላሽ በመጠበቅ ላይ...');
+            } else {
+                alert('እባክዎ የሚደውሉበትን ቁጥር ያስገቡ!');
+            }
+        });
+
+        // ገቢ ጥሪ ሲመጣ
+        socket.on('incoming-call', ({ callerPhoneNumber, callerSocketId }) => {
+            const accept = confirm(`ከ ${callerPhoneNumber} የድምጽ ጥሪ መጥቷል መቀበል ይፈልጋሉ?`);
+            if (accept) {
+                socket.emit('accept-call', { callerSocketId: callerSocketId });
+                alert('ጥሪው ተቀባይነት አግኝቷል!');
+            }
+        });
+
+        // ጥሪ ካልተሳካ
+        socket.on('call-failed', ({ message }) => {
+            alert(message);
         });
     </script>
 </body>
