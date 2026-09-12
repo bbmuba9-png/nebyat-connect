@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebyat Connect</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f4f4f9; }
+        h1 { color: #333; }
+        #room-container { margin-top: 20px; }
+        input { padding: 10px; font-size: 16px; width: 200px; }
+        button { padding: 10px 20px; font-size: 16px; background: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <h1>Nebyat Connect - P2P Voice</h1>
+    <div id="room-container">
+        <input type="text" id="room-input" placeholder="Enter Room ID">
+        <button id="join-btn">Join Room</button>
+    </div>
+
+    <script>
+        const socket = io();
+        const joinBtn = document.getElementById('join-btn');
+        const roomInput = document.getElementById('room-input');
+
+        joinBtn.addEventListener('click', () => {
+            const roomId = roomInput.value.trim();
+            if (roomId) {
+                socket.emit('join-room', roomId, socket.id);
+                alert('Joined room: ' + roomId);
+            } else {
+                alert('Please enter a valid Room ID');
+            }
+        });
+
+        socket.on('user-connected', userId => {
+            console.log('User connected: ' + userId);
+            alert('Another user connected to the room!');
+        });
+    </script>
+</body>
+</html>
